@@ -14,15 +14,16 @@ if environ.get('DEBUG', '').lower() == 'true':
 
 # For some reason our logging won't emit correctly unless an initial message is
 # sent in.
-logging.debug("Plugin initializing.")
+logging.debug("")
 
 _SETTINGS_KEY = "org.gnome.gedit.preferences.editor"
 _MAX_STORED_AGE_S = 86400 * 7 * 4
 _DATETIME_FORMAT = '%Y%m%d-%H%M%S'
+_PREF_DIR_NAME = '.gedit-unsaved'
 
 _gedit_settings = Settings(_SETTINGS_KEY)
 _start_timestamp = datetime.now().strftime(_DATETIME_FORMAT)
-_store_root = join(expanduser('~'), '.gedit-unsaved')
+_store_root = join(expanduser('~'), _PREF_DIR_NAME)
 _store_path = join(_store_root, _start_timestamp)
 
 
