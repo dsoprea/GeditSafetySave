@@ -196,8 +196,8 @@ class SafetySavePluginViewExtension(GObject.Object, Gedit.ViewActivatable):
     def __store_unsaved_cb(self):
         self.__debug("Checking state of unsaved document.")
 
-# TODO: I'm going to have to ask someone about either 1) check for a dirty 
-#       state, or 2) determining if a key-press affects the document.
+# TODO: We might think about taking a hash of the document to determine if it
+#       has changed.
 
         # Is it untouched (i.e. empty)?
         if self.__document.is_untouched() is True:
