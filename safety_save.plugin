@@ -1,0 +1,10 @@
+[Plugin]
+Loader=python
+Module=safety_save
+IAge=3
+Name=Safety Save
+Description=Keep your unsaved data safe.
+Authors=Dustin Oprea <dustin@randomingenuity.com>
+Copyright=Copyright © 2013 Dustin Oprea <dustin@randomingenuity.com>
+Website=github.com/dsoprea/GeditSafetySave
+
