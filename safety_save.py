@@ -207,8 +207,9 @@ class SafetySavePluginViewExtension(GObject.Object, Gedit.ViewActivatable):
 
         self.__ensure_path()
 
-# TODO: Can we gracefully/efficiently iterate through lines? Can we be given 
-#       the newlines to use rather than deriving this on our own?
+        # We're not worried about size since gedit performs poorly with large 
+        # files. There's also a lesser issue of consistency, if we were to 
+        # iterate line-by-line.
         text = self.__document.get_text(self.__document.get_start_iter(), 
                                         self.__document.get_end_iter(), 
                                         True)
