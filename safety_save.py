@@ -114,14 +114,12 @@ class SafetySavePluginViewExtension(GObject.Object, Gedit.ViewActivatable):
         try:
             return self.__enabled
         except AttributeError:
-            self.__enabled = _gedit_settings.get_boolean('auto-save')
-            self.__run_interval_s = \
-                _gedit_settings.get_uint('auto-save-interval')
-
-            if self.__enabled is False:
-                self.__warning("Plugin will not do anything because the "
-                               "standard 'auto-save' configurable is not "
-                               "enabled.")
+            self.__enabled = True
+            if not _gedit_settings.get_boolean('auto-save'):
+                self.__run_interval_s = 60
+            else:
+                self.__run_interval_s = \
+                    _gedit_settings.get_uint('auto-save-interval')
 
             self.__debug("Enabled? %s" % (self.__enabled))
             return self.__enabled
