@@ -18,11 +18,11 @@ logging.debug("")
 
 _SETTINGS_KEY = "org.gnome.gedit.preferences.editor"
 _MAX_STORED_AGE_S = 86400 * 7 * 4
-_DATETIME_FORMAT = '%Y%m%d-%H%M%S'
+_DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 _PREF_DIR_NAME = '.gedit-unsaved'
 
 _gedit_settings = Settings(_SETTINGS_KEY)
-_start_timestamp = datetime.now().strftime(_DATETIME_FORMAT)
+_start_timestamp = datetime.utcnow().strftime(_DATETIME_FORMAT)
 _store_root = join(expanduser('~'), _PREF_DIR_NAME)
 _store_path = join(_store_root, _start_timestamp)
 
@@ -49,7 +49,7 @@ class SafetySavePluginAppExtension(GObject.Object, Gedit.AppActivatable):
                    (len(timestamp_subdirs)))
         for timestamp_subdir in sorted(timestamp_subdirs):
             dt = datetime.strptime(timestamp_subdir, _DATETIME_FORMAT)
-            age = (datetime.now() - dt).total_seconds()
+            age = (datetime.utcnow() - dt).total_seconds()
             if age < _MAX_STORED_AGE_S:
                 _log.debug("[%s] is too recent: (%.2f) days" %
                            (timestamp_subdir, (float(age) / 86400.0)))
