@@ -4,7 +4,7 @@ from datetime import datetime
 from os import environ, makedirs, unlink, listdir, rmdir
 from os.path import expanduser, join, exists
 
-from gi.repository import GObject, Gedit
+from gi.repository import GLib, GObject, Gedit
 from gi.repository.Gio import Settings
 
 _log = logging.getLogger('SafetySave')
@@ -18,12 +18,11 @@ logging.debug("")
 
 _SETTINGS_KEY = "org.gnome.gedit.preferences.editor"
 _MAX_STORED_AGE_S = 86400 * 7 * 4
-_DATETIME_FORMAT = '%Y%m%d-%H%M%S'
-_PREF_DIR_NAME = '.gedit-unsaved'
+_DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 
 _gedit_settings = Settings(_SETTINGS_KEY)
-_start_timestamp = datetime.now().strftime(_DATETIME_FORMAT)
-_store_root = join(expanduser('~'), _PREF_DIR_NAME)
+_start_timestamp = datetime.utcnow().strftime(_DATETIME_FORMAT)
+_store_root = join(GLib.get_user_data_dir(), 'gedit', 'unsaved')
 _store_path = join(_store_root, _start_timestamp)
 
 
@@ -33,7 +32,7 @@ class SafetySavePluginAppExtension(GObject.Object, Gedit.AppActivatable):
 
     def __init__(self):
         GObject.Object.__init__(self)
- 
+
     def __do_cleanup(self):
         """Determine if any old session backups need to be cleared."""
 
@@ -45,16 +44,17 @@ class SafetySavePluginAppExtension(GObject.Object, Gedit.AppActivatable):
             _log.debug("The storage path doesn't exist: %s" % (_store_path))
             return
 
-        _log.debug("(%d) session-backup directories found." % (len(timestamp_subdirs)))
+        _log.debug("(%d) session-backup directories found." %
+                   (len(timestamp_subdirs)))
         for timestamp_subdir in sorted(timestamp_subdirs):
             dt = datetime.strptime(timestamp_subdir, _DATETIME_FORMAT)
-            age = (datetime.now() - dt).total_seconds()
+            age = (datetime.utcnow() - dt).total_seconds()
             if age < _MAX_STORED_AGE_S:
-                _log.debug("[%s] is too recent: (%.2f) days" % 
+                _log.debug("[%s] is too recent: (%.2f) days" %
                            (timestamp_subdir, (float(age) / 86400.0)))
                 continue
 
-            _log.info("Cleaning-up temporary storage for old session: %s" % 
+            _log.info("Cleaning-up temporary storage for old session: %s" %
                       (timestamp_subdir))
 
             path = join(_store_root, timestamp_subdir)
@@ -83,7 +83,7 @@ class SafetySavePluginViewExtension(GObject.Object, Gedit.ViewActivatable):
         GObject.Object.__init__(self)
         self.__watch_state = False
 
-    ## Logging methods.
+    # Logging methods.
 
     def __log(self, method, message):
         method("[%s] %s" % (self.__get_name(), message))
@@ -104,7 +104,7 @@ class SafetySavePluginViewExtension(GObject.Object, Gedit.ViewActivatable):
 
     def __ensure_path(self):
         if exists(_store_path) is False:
-            self.__info("Creating temporary unsaved store path: %s" % 
+            self.__info("Creating temporary unsaved store path: %s" %
                         (_store_path))
             makedirs(_store_path)
 
@@ -114,30 +114,26 @@ class SafetySavePluginViewExtension(GObject.Object, Gedit.ViewActivatable):
         try:
             return self.__enabled
         except AttributeError:
-            self.__enabled = _gedit_settings.get_boolean('auto-save')
-            self.__run_interval_s = \
-                _gedit_settings.get_uint('auto-save-interval')
-
-            if self.__enabled is False:
-                self.__warning("Plugin will not do anything because the "
-                               "standard 'auto-save' configurable is not "
-                               "enabled.")
-
+            self.__enabled = True
+            if not _gedit_settings.get_boolean('auto-save'):
+                self.__run_interval_s = 60
+            else:
+                self.__run_interval_s = \
+                    _gedit_settings.get_uint('auto-save-interval')
 
             self.__debug("Enabled? %s" % (self.__enabled))
             return self.__enabled
 
     def __set_schedule(self):
-        """Schedule our own "save" events (we won't see any from gEdit since 
+        """Schedule our own "save" events (we won't see any from gEdit since
         we're not named).
         """
 
         wait_s = self.__run_interval_s * 60
         self.__debug("Scheduling save for (%d) second intervals." % (wait_s))
 
-        self.__save_timer_id = GObject.timeout_add_seconds(
-                                wait_s, 
-                                self.__store_unsaved_cb)
+        i = GObject.timeout_add_seconds(wait_s, self.__store_unsaved_cb)
+        self.__save_timer_id = i
 
     def __clear_schedule(self):
         self.__debug("Cancelling save schedule.")
@@ -160,7 +156,7 @@ class SafetySavePluginViewExtension(GObject.Object, Gedit.ViewActivatable):
 
     def __watch_start(self):
         "Set-up events and scheduling."
-    
+
         self.__watch_state = True
 
         self.__debug("Starting watch.")
@@ -169,7 +165,7 @@ class SafetySavePluginViewExtension(GObject.Object, Gedit.ViewActivatable):
 
         self.__hook_signals()
         self.__set_schedule()
-        
+
     def __watch_stop(self):
         if self.__is_watching() is False:
             return
@@ -186,7 +182,7 @@ class SafetySavePluginViewExtension(GObject.Object, Gedit.ViewActivatable):
 
     def __on_saved(self, widget, *args, **kwargs):
         "This signal only occurs when named documents are successful saved."
-    
+
         if self.__is_watching() is True:
             self.__watch_stop()
             self.__cleanup_temp_file()
@@ -208,14 +204,14 @@ class SafetySavePluginViewExtension(GObject.Object, Gedit.ViewActivatable):
 
         self.__ensure_path()
 
-        # We're not worried about size since gedit performs poorly with large 
-        # files. There's also a lesser issue of consistency, if we were to 
+        # We're not worried about size since gedit performs poorly with large
+        # files. There's also a lesser issue of consistency, if we were to
         # iterate line-by-line.
-        text = self.__document.get_text(self.__document.get_start_iter(), 
-                                        self.__document.get_end_iter(), 
+        text = self.__document.get_text(self.__document.get_start_iter(),
+                                        self.__document.get_end_iter(),
                                         True)
 
-        self.__info("Storing unnamed file as (%d) bytes to: %s" % 
+        self.__info("Storing unnamed file as (%d) bytes to: %s" %
                     (len(text), self.__file_path))
 
         with open(self.__file_path, 'w') as f:
@@ -255,4 +251,3 @@ class SafetySavePluginViewExtension(GObject.Object, Gedit.ViewActivatable):
             return
 
         self.__watch_stop()
-
